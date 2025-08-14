@@ -1,6 +1,6 @@
+from openai import OpenAI
 import streamlit as st
 import pdfplumber
-import openai
 import pandas as pd
 
 st.set_page_config(page_title="Payer Plan GPT Extractor", layout="wide")
@@ -8,25 +8,31 @@ st.title("🤖 Payer Plan Field Extractor with GPT")
 
 mode = st.radio("Choose Mode:", ["Single PDF Extraction", "Compare Two PDFs"])
 
+# New client
+client = None
 if "OPENAI_API_KEY" in st.secrets:
-    openai.api_key = st.secrets["OPENAI_API_KEY"]
+    client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 else:
-    openai.api_key = st.text_input("Enter your OpenAI API Key:", type="password")
+    key_input = st.text_input("Enter OpenAI API Key:", type="password")
+    if key_input:
+        client = OpenAI(api_key=key_input)
 
 def pdf_to_text(pdf_file):
     with pdfplumber.open(pdf_file) as pdf:
         return "\n".join(page.extract_text() or "" for page in pdf.pages)
 
 def extract_with_gpt(text, fields):
+    if client is None:
+        return {f: "" for f in fields}
     prompt = f"Extract these fields from the policy text:\n{', '.join(fields)}\n\nText:\n{text}"
-    res = openai.ChatCompletion.create(
+    resp = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[{"role": "user", "content": prompt}],
         temperature=0,
     )
     import json
     try:
-        return json.loads(res.choices[0].message["content"])
+        return json.loads(resp.choices[0].message.content)
     except:
         return {f: "" for f in fields}
 
