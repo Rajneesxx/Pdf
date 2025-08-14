@@ -18,6 +18,39 @@ if not api_key_input:
 
 client = OpenAI(api_key=api_key_input)
 
+# -------------------- Preloaded Fields --------------------
+QLM_FIELDS = [
+    "Insured",
+    "Policy No",
+    "Period of Insurance",
+    "Plan",
+    "For Eligible Medical Expenses at Al Ahli Hospital",
+    "Inpatient Deductible",
+    "Deductible per each outpatient consultation",
+    "Vaccination of children",
+    "Psychiatric Treatment",
+    "Dental Copayment",
+    "Maternity Copayment",
+    "Optical Copayment"
+]
+
+ALKOOT_FIELDS = [
+    "Policy Number",
+    "Category",
+    "Effective Date",
+    "Expiry Date",
+    "Provider-specific co-insurance at Al Ahli Hospital",
+    "Co-insurance on all inpatient treatment",
+    "Deductible on consultation",
+    "Vaccination & Immunization",
+    "Psychiatric treatment & Psychotherapy",
+    "Pregnancy & Childbirth",
+    "Dental Benefit",
+    "Optical Benefit"
+]
+
+target_fields = QLM_FIELDS + ALKOOT_FIELDS
+
 # -------------------- Helper Functions --------------------
 def pdf_to_text(pdf_file):
     """Extract text from uploaded PDF"""
@@ -29,22 +62,10 @@ def clean_text(text):
     return " ".join(text.split())
 
 def extract_with_gpt(text, fields, client, max_retries=3):
-    """
-    Extract specified fields from policy text using OpenAI GPT.
-
-    Args:
-        text (str): The full policy text.
-        fields (list[str]): List of field names to extract.
-        client (OpenAI): OpenAI client instance.
-        max_retries (int): Number of retries if JSON parsing fails.
-
-    Returns:
-        dict: Dictionary mapping field names to extracted values.
-    """
+    """Extract specified fields from policy text using OpenAI GPT with retries"""
     if client is None:
         return {f: "" for f in fields}
 
-    # Strong structured prompt
     prompt = f"""
 You are a strict data extraction assistant.
 Extract ONLY the following fields from the insurance policy text.
@@ -70,7 +91,7 @@ Policy Text:
             )
             resp_text = resp.choices[0].message.content.strip()
 
-            # Auto-cleaning: remove any text before/after JSON
+            # Auto-cleaning: extract JSON portion only
             idx_start = resp_text.find("{")
             idx_end = resp_text.rfind("}")
             if idx_start == -1 or idx_end == -1 or idx_end <= idx_start:
@@ -80,24 +101,16 @@ Policy Text:
             return json.loads(resp_text)
 
         except Exception as e:
-            # If last attempt, return empty fields
             if attempt == max_retries - 1:
                 print(f"GPT returned invalid JSON. Returning empty fields. Error: {e}")
                 return {f: "" for f in fields}
-            # Otherwise, retry
             continue
+
 def display_comparison_table(df):
     """Highlight differences in a comparison table"""
     def highlight_diff(row):
         return ['background-color: yellow' if row['Old Policy'] != row['New Policy'] else '' for _ in row]
     st.dataframe(df.style.apply(highlight_diff, axis=1))
-
-# -------------------- Fields to Extract --------------------
-fields_input = st.text_area(
-    "Fields to extract (one per line):",
-    "Policy No\nPeriod of Insurance\nPlan"
-)
-target_fields = [f.strip() for f in fields_input.split("\n") if f.strip()]
 
 # -------------------- Main App Logic --------------------
 if mode == "Single PDF Extraction":
