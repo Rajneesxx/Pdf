@@ -13,14 +13,20 @@ mode = st.radio("Choose Mode:", ["Single PDF Extraction", "Compare Two PDFs"])
 # Initialize OpenAI client
 from openai import OpenAI
 
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+api_key = st.secrets.get("OPENAI_API_KEY")
+if not api_key:
+    st.error("OpenAI API key not found! Add it in Streamlit Secrets.")
+    st.stop()
 
-resp = client.chat.completions.create(
+client = OpenAI(api_key=api_key)
+res = client.chat.completions.create(
     model="gpt-4o-mini",
     messages=[{"role": "user", "content": prompt}],
     temperature=0,
 )
-data = resp.choices[0].message.content
+
+data = res.choices[0].message.content  # this contains the extracted text
+
 
 def pdf_to_text(pdf_file):
     with pdfplumber.open(pdf_file) as pdf:
