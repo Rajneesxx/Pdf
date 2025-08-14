@@ -18,38 +18,21 @@ if not api_key_input:
 
 client = OpenAI(api_key=api_key_input)
 
-# -------------------- Preloaded Fields --------------------
+# -------------------- Predefined Fields --------------------
 QLM_FIELDS = [
-    "Insured",
-    "Policy No",
-    "Period of Insurance",
-    "Plan",
-    "For Eligible Medical Expenses at Al Ahli Hospital",
-    "Inpatient Deductible",
-    "Deductible per each outpatient consultation",
-    "Vaccination of children",
-    "Psychiatric Treatment",
-    "Dental Copayment",
-    "Maternity Copayment",
-    "Optical Copayment"
+    "Insured", "Policy No", "Period of Insurance", "Plan",
+    "For Eligible Medical Expenses at Al Ahli Hospital", "Inpatient Deductible",
+    "Deductible per each outpatient consultation", "Vaccination of children",
+    "Psychiatric Treatment", "Dental Copayment", "Maternity Copayment", "Optical Copayment"
 ]
 
 ALKOOT_FIELDS = [
-    "Policy Number",
-    "Category",
-    "Effective Date",
-    "Expiry Date",
+    "Policy Number", "Category", "Effective Date", "Expiry Date",
     "Provider-specific co-insurance at Al Ahli Hospital",
-    "Co-insurance on all inpatient treatment",
-    "Deductible on consultation",
-    "Vaccination & Immunization",
-    "Psychiatric treatment & Psychotherapy",
-    "Pregnancy & Childbirth",
-    "Dental Benefit",
-    "Optical Benefit"
+    "Co-insurance on all inpatient treatment", "Deductible on consultation",
+    "Vaccination & Immunization", "Psychiatric treatment & Psychotherapy",
+    "Pregnancy & Childbirth", "Dental Benefit", "Optical Benefit"
 ]
-
-target_fields = QLM_FIELDS + ALKOOT_FIELDS
 
 # -------------------- Helper Functions --------------------
 def pdf_to_text(pdf_file):
@@ -62,7 +45,7 @@ def clean_text(text):
     return " ".join(text.split())
 
 def extract_with_gpt(text, fields, client, max_retries=3):
-    """Extract specified fields from policy text using OpenAI GPT with retries"""
+    """Extract specified fields from policy text using OpenAI GPT with retries and cleaning"""
     if client is None:
         return {f: "" for f in fields}
 
@@ -91,7 +74,7 @@ Policy Text:
             )
             resp_text = resp.choices[0].message.content.strip()
 
-            # Auto-cleaning: extract JSON portion only
+            # Auto-cleaning: extract JSON only
             idx_start = resp_text.find("{")
             idx_end = resp_text.rfind("}")
             if idx_start == -1 or idx_end == -1 or idx_end <= idx_start:
@@ -114,28 +97,40 @@ def display_comparison_table(df):
 
 # -------------------- Main App Logic --------------------
 if mode == "Single PDF Extraction":
+    pdf_type = st.selectbox("Select Payer Plan Type:", ["QLM", "ALKOOT"])
+    fields_to_use = QLM_FIELDS if pdf_type == "QLM" else ALKOOT_FIELDS
+
     pdf_file = st.file_uploader("Upload PDF", type=["pdf"])
     if pdf_file:
         text = clean_text(pdf_to_text(pdf_file))
-        data = extract_with_gpt(text, target_fields, client)
+        data = extract_with_gpt(text, fields_to_use, client)
         st.table(pd.DataFrame(data.items(), columns=["Field", "Value"]))
 
 else:
     col1, col2 = st.columns(2)
+
     with col1:
+        old_pdf_type = st.selectbox("Old PDF Plan Type:", ["QLM", "ALKOOT"], key="old_type")
         old_pdf = st.file_uploader("Old Policy PDF", type=["pdf"], key="old")
     with col2:
+        new_pdf_type = st.selectbox("New PDF Plan Type:", ["QLM", "ALKOOT"], key="new_type")
         new_pdf = st.file_uploader("New Policy PDF", type=["pdf"], key="new")
 
     if old_pdf and new_pdf:
+        old_fields = QLM_FIELDS if old_pdf_type == "QLM" else ALKOOT_FIELDS
+        new_fields = QLM_FIELDS if new_pdf_type == "QLM" else ALKOOT_FIELDS
+
         old_text = clean_text(pdf_to_text(old_pdf))
         new_text = clean_text(pdf_to_text(new_pdf))
-        old_data = extract_with_gpt(old_text, target_fields, client)
-        new_data = extract_with_gpt(new_text, target_fields, client)
 
+        old_data = extract_with_gpt(old_text, old_fields, client)
+        new_data = extract_with_gpt(new_text, new_fields, client)
+
+        # Use union of fields for comparison table
+        all_fields = list(set(old_fields + new_fields))
         df = pd.DataFrame({
-            "Field": target_fields,
-            "Old Policy": [old_data.get(f, "") for f in target_fields],
-            "New Policy": [new_data.get(f, "") for f in target_fields],
+            "Field": all_fields,
+            "Old Policy": [old_data.get(f, "") for f in all_fields],
+            "New Policy": [new_data.get(f, "") for f in all_fields],
         })
         display_comparison_table(df)
