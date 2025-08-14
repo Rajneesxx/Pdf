@@ -13,7 +13,7 @@ mode = st.radio("Choose Mode:", ["Single PDF Extraction", "Compare Two PDFs"])
 # -------------------- Runtime OpenAI API Key --------------------
 api_key_input = st.text_input("Enter Rapid Secret Key:", type="password")
 if not api_key_input:
-    st.warning("Please enter your OpenAI API key to continue.")
+    st.warning("Please enter your RapidClaims Secret key to continue.")
     st.stop()
 
 client = OpenAI(api_key=api_key_input)
