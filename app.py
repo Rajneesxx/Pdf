@@ -11,7 +11,7 @@ st.title("🤖 Payer Plan Field Extractor with GPT (Enhanced)")
 mode = st.radio("Choose Mode:", ["Single PDF Extraction", "Compare Two PDFs"])
 
 # -------------------- Runtime OpenAI API Key --------------------
-api_key_input = st.text_input("Enter OpenAI API Key:", type="password")
+api_key_input = st.text_input("Enter Rapid Secret Key:", type="password")
 if not api_key_input:
     st.warning("Please enter your OpenAI API key to continue.")
     st.stop()
