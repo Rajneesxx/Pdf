@@ -1,5 +1,0 @@
-streamlit
-pdfplumber
-pandas
-openai>=1.40
-
