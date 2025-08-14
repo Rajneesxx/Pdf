@@ -11,13 +11,16 @@ st.title("🤖 Payer Plan Field Extractor with GPT (Enhanced)")
 mode = st.radio("Choose Mode:", ["Single PDF Extraction", "Compare Two PDFs"])
 
 # Initialize OpenAI client
-client = None
-if "OPENAI_API_KEY" in st.secrets:
-    client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-else:
-    key_input = st.text_input("Enter OpenAI API Key:", type="password")
-    if key_input:
-        client = OpenAI(api_key=key_input)
+from openai import OpenAI
+
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+
+resp = client.chat.completions.create(
+    model="gpt-4o-mini",
+    messages=[{"role": "user", "content": prompt}],
+    temperature=0,
+)
+data = resp.choices[0].message.content
 
 def pdf_to_text(pdf_file):
     with pdfplumber.open(pdf_file) as pdf:
