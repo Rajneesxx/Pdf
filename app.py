@@ -28,37 +28,64 @@ def clean_text(text):
     """Remove extra spaces and newlines"""
     return " ".join(text.split())
 
-def extract_with_gpt(text, fields, client):
+def extract_with_gpt(text, fields, client, max_retries=3):
     """
-    Extract specific fields from policy text using GPT
+    Extract specified fields from policy text using OpenAI GPT.
+
+    Args:
+        text (str): The full policy text.
+        fields (list[str]): List of field names to extract.
+        client (OpenAI): OpenAI client instance.
+        max_retries (int): Number of retries if JSON parsing fails.
+
+    Returns:
+        dict: Dictionary mapping field names to extracted values.
     """
+    if client is None:
+        return {f: "" for f in fields}
+
+    # Strong structured prompt
     prompt = f"""
-You are a data extraction assistant.
+You are a strict data extraction assistant.
 Extract ONLY the following fields from the insurance policy text.
+
 Fields: {', '.join(fields)}
 
-Return a valid JSON object with keys exactly matching the field names.
-If a field is not found, set its value to an empty string.
+IMPORTANT:
+- Return a single JSON object only.
+- Keys must match the field names exactly.
+- Do NOT add any explanation, notes, or extra text outside the JSON.
+- If a field is missing, use an empty string as its value.
 
 Policy Text:
 {text}
 """
-    try:
-        resp = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0
-        )
-        content = resp.choices[0].message.content.strip()
-        try:
-            return json.loads(content)
-        except json.JSONDecodeError:
-            st.warning("GPT returned invalid JSON. Returning empty fields.")
-            return {f: "" for f in fields}
-    except Exception as e:
-        st.error(f"Error calling GPT: {e}")
-        return {f: "" for f in fields}
 
+    for attempt in range(max_retries):
+        try:
+            resp = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0
+            )
+            resp_text = resp.choices[0].message.content.strip()
+
+            # Auto-cleaning: remove any text before/after JSON
+            idx_start = resp_text.find("{")
+            idx_end = resp_text.rfind("}")
+            if idx_start == -1 or idx_end == -1 or idx_end <= idx_start:
+                raise ValueError("No JSON object found in GPT response.")
+            resp_text = resp_text[idx_start:idx_end + 1]
+
+            return json.loads(resp_text)
+
+        except Exception as e:
+            # If last attempt, return empty fields
+            if attempt == max_retries - 1:
+                print(f"GPT returned invalid JSON. Returning empty fields. Error: {e}")
+                return {f: "" for f in fields}
+            # Otherwise, retry
+            continue
 def display_comparison_table(df):
     """Highlight differences in a comparison table"""
     def highlight_diff(row):
